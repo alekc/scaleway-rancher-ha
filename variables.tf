@@ -25,3 +25,6 @@ variable "server_host_name" {}
 variable "dns_ttl" {
   default = 120
 }
+variable "node_count" {
+  default = "1"
+}

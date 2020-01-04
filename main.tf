@@ -16,14 +16,20 @@ data "scaleway_instance_image" "docker" {
   name         = "docker"
 }
 
+resource "scaleway_instance_placement_group" "rancherserver" {
+  name        = "${var.prefix}-rancher-sg"
+  policy_type = "max_availability"
+  policy_mode = "optional"
+}
 #create server
 resource "scaleway_instance_server" "rancherserver" {
-  count             = 1
-  image             = "docker"
-  type              = "DEV1-L"
-  name              = "rancher-${count.index + 1}"
-  cloud_init        = data.template_file.cloud-init.rendered
-  enable_dynamic_ip = true
+  count              = var.node_count
+  image              = "docker"
+  type               = "DEV1-L"
+  name               = "rancher-${count.index + 1}"
+  cloud_init         = data.template_file.cloud-init.rendered
+  placement_group_id = scaleway_instance_placement_group.rancherserver.id
+  enable_dynamic_ip  = true
   provisioner "remote-exec" {
     connection {
       host        = self.public_ip
@@ -35,7 +41,7 @@ resource "scaleway_instance_server" "rancherserver" {
 
     inline = [
       "echo Waiting for cloud-init...",
-      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+      "cloud-init status --wait",
       "echo cloud-init is finished!",
     ]
   }
@@ -75,20 +81,46 @@ resource "local_file" "rke-config" {
 }
 
 #cluster deploy
-data "template_file" "cluster_deploy" {
-  template = file("files/install.sh")
+data "template_file" "rke_deploy" {
+  template = file("files/rke-install-template.sh")
+}
+data "template_file" "rancher_deploy" {
+  template = file("files/rancher-install-template.sh")
   vars = {
     hostname = cloudflare_record.rancher_main[0].hostname
     email    = var.letsencrypt_email
     le_env   = var.letsencrypt_env
   }
 }
+//Decomment for debug
+//resource "local_file" "rke_deploy" {
+//  filename = format("%s/%s", path.root, "rke-install.sh")
+//  content  = data.template_file.rke_deploy.rendered
+//}
 
-resource "null_resource" "install_rancher" {
-  depends_on = [local_file.rke-config]
+resource "null_resource" "rke_deploy" {
+  triggers = {
+    cluster_instance_ids = "${join(",", scaleway_instance_server.rancherserver[*].id)}"
+  }
   provisioner "local-exec" {
+    working_dir = path.root
+    interpreter = ["/bin/bash", "-c"]
+    //|| rm -f install.sh
+    //bash ${format("%s/%s", path.root, "rke-install.sh")}
     command = <<EOF
-    ${data.template_file.cluster_deploy.rendered}
+    ${data.template_file.rke_deploy.rendered}
+EOF
+  }
+}
+resource "null_resource" "install_rancher" {
+  depends_on = [null_resource.rke_deploy]
+  provisioner "local-exec" {
+    working_dir = path.root
+    interpreter = ["/bin/bash", "-c"]
+    //|| rm -f install.sh
+    //bash ${format("%s/%s", path.root, "rke-install.sh")}
+    command = <<EOF
+    ${data.template_file.rancher_deploy.rendered}
 EOF
   }
 }
