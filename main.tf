@@ -16,18 +16,29 @@ data "scaleway_instance_image" "docker" {
   name         = "docker"
 }
 
+//placegroup
 resource "scaleway_instance_placement_group" "rancherserver" {
   name        = "${var.prefix}-rancher-sg"
   policy_type = "max_availability"
   policy_mode = "optional"
 }
-#create server
+
+#control server
 resource "scaleway_instance_server" "rancherserver" {
   count              = var.node_count
   image              = "docker"
   type               = "DEV1-L"
   name               = "rancher-${count.index + 1}"
-  cloud_init         = data.template_file.cloud-init.rendered
+  cloud_init         = <<EOF
+#!/usr/bin/env bash
+export DEBIAN_FRONTEND=noninteractive
+
+#apt-get update
+#apt-get upgrade -y
+
+#workaround to avoid "Failed to get job complete status for job rke-network-plugin-deploy-job in namespace kube-system"
+docker pull rancher/pause:3.1
+EOF
   placement_group_id = scaleway_instance_placement_group.rancherserver.id
   enable_dynamic_ip  = true
   provisioner "remote-exec" {
@@ -45,18 +56,9 @@ resource "scaleway_instance_server" "rancherserver" {
       "echo cloud-init is finished!",
     ]
   }
-  //  provisioner "remote-exec" {
-  //    inline = [
-  //      "while [ ! -f /root/signal ]; do sleep 2; done",
-  //    ]
-  //  }
 }
-#dns record for it.
-data "template_file" "cloud-init" {
-  template = file("files/cloud-init.sh")
-  vars = {
-  }
-}
+
+//dns entries
 resource "cloudflare_record" "rancher_main" {
   count   = 1
   zone_id = var.cf_zone_id
@@ -67,23 +69,34 @@ resource "cloudflare_record" "rancher_main" {
   value   = scaleway_instance_server.rancherserver[count.index].public_ip
 }
 
-#generate config file.
-data "template_file" "rke-config" {
-  template = file("files/rancher-cluster-template.yml")
-  vars = {
-    internal_address = scaleway_instance_server.rancherserver[0].private_ip
-    public_address   = scaleway_instance_server.rancherserver[0].public_ip
-  }
-}
+#put rancher cluster configuration in yml file
 resource "local_file" "rke-config" {
   filename = format("%s/%s", path.root, "rancher_cluster.yml")
-  content  = data.template_file.rke-config.rendered
+  //noinspection HILUnresolvedReference
+  content = <<EOF
+nodes:
+%{for node in scaleway_instance_server.rancherserver~}
+  - address: ${node.public_ip}
+    internal_address: ${node.private_ip}
+    user: root
+    role: [controlplane, worker, etcd]
+%{endfor~}
+
+services:
+  etcd:
+    snapshot: true
+    creation: 6h
+    retention: 24h
+
+# Required for external TLS termination with
+# ingress-nginx v0.22+
+ingress:
+  provider: nginx
+  options:
+    use-forwarded-headers: "true"
+EOF
 }
 
-#cluster deploy
-data "template_file" "rke_deploy" {
-  template = file("files/rke-install-template.sh")
-}
 data "template_file" "rancher_deploy" {
   template = file("files/rancher-install-template.sh")
   vars = {
@@ -100,15 +113,20 @@ data "template_file" "rancher_deploy" {
 
 resource "null_resource" "rke_deploy" {
   triggers = {
-    cluster_instance_ids = "${join(",", scaleway_instance_server.rancherserver[*].id)}"
+    cluster_instance_ids = join(",", scaleway_instance_server.rancherserver[*].id)
   }
   provisioner "local-exec" {
     working_dir = path.root
     interpreter = ["/bin/bash", "-c"]
-    //|| rm -f install.sh
-    //bash ${format("%s/%s", path.root, "rke-install.sh")}
-    command = <<EOF
-    ${data.template_file.rke_deploy.rendered}
+    command     = <<EOF
+#!/usr/bin/env bash
+set -x
+set -e
+
+rm -f kube_config_rancher_cluster.yml
+#rm -f rancher_cluster.yml
+rm -f rancher_cluster.rkestate
+rke up --config rancher_cluster.yml
 EOF
   }
 }
@@ -117,9 +135,7 @@ resource "null_resource" "install_rancher" {
   provisioner "local-exec" {
     working_dir = path.root
     interpreter = ["/bin/bash", "-c"]
-    //|| rm -f install.sh
-    //bash ${format("%s/%s", path.root, "rke-install.sh")}
-    command = <<EOF
+    command     = <<EOF
     ${data.template_file.rancher_deploy.rendered}
 EOF
   }

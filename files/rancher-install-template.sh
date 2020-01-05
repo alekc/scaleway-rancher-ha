@@ -26,6 +26,7 @@ helm install \
 
 kubectl -n cert-manager rollout status deploy/cert-manager
 
+set +e
 helm install rancher rancher-$${RANCHER_BRANCH}/rancher \
   --version 2.3.4-rc7 \
   --namespace cattle-system \
