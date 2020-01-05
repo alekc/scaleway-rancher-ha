@@ -58,6 +58,16 @@ EOF
     ]
   }
 }
+resource "cloudflare_record" "rancher_main" {
+  count   = var.node_count
+  zone_id = var.cf_zone_id
+  name    = "${var.prefix}.${format("rancher-%03d", count.index + 1)}"
+  type    = "A"
+  ttl     = var.dns_ttl //must be 1 when proxied
+  proxied = false
+  value   = scaleway_instance_server.rancherserver[count.index].public_ip
+}
+
 output "rancher_ips" {
   value = scaleway_instance_server.rancherserver[*].public_ip
 }

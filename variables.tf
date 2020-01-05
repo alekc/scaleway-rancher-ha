@@ -21,7 +21,7 @@ variable "prefix" {
 variable "instance_name" {
   default = "rancher"
 }
-variable "server_host_name" {}
+
 variable "dns_ttl" {
   default = 120
 }
@@ -39,7 +39,7 @@ variable "rancher_cert_install" {
   description = "Set to 1 for lets encrypt certificate installation"
   default     = "0"
 }
-variable "rancher_hostname" {
+variable "rancher_hostname_fqdn" {
   description = "Rancher hostname"
   default     = "domain.com"
 }

@@ -3,7 +3,7 @@
 data "template_file" "rancher_deploy" {
   template = file("files/rancher-install-le-template.sh")
   vars = {
-    hostname       = var.rancher_hostname
+    hostname       = var.rancher_hostname_fqdn
     email          = var.letsencrypt_email
     le_env         = var.letsencrypt_env
     rancher_branch = var.rancher_branch
@@ -25,7 +25,7 @@ EOF
 data "template_file" "rancher_install_with_cert" {
   template = file("files/rancher-install-cert-template.sh")
   vars = {
-    hostname       = var.rancher_hostname
+    hostname       = var.rancher_hostname_fqdn
     rancher_branch = var.rancher_branch
   }
 }
