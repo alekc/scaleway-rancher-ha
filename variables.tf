@@ -39,3 +39,7 @@ variable "rancher_cert_install" {
   description = "Set to 1 for lets encrypt certificate installation"
   default     = "0"
 }
+variable "rancher_hostname" {
+  description = "Rancher hostname"
+  default     = "domain.com"
+}
