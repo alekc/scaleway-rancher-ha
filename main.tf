@@ -58,10 +58,21 @@ EOF
     ]
   }
 }
+#individual record for a single server
 resource "cloudflare_record" "rancher_main" {
   count   = var.node_count
   zone_id = var.cf_zone_id
   name    = "${var.prefix}.${format("rancher-%03d", count.index + 1)}"
+  type    = "A"
+  ttl     = var.dns_ttl //must be 1 when proxied
+  proxied = false
+  value   = scaleway_instance_server.rancherserver[count.index].public_ip
+}
+#general dns entry. Will/can be used for an external load balancer (by querying it's a record)
+resource "cloudflare_record" "rancher_main" {
+  count   = var.node_count
+  zone_id = var.cf_zone_id
+  name    = "${var.prefix}.rancher"
   type    = "A"
   ttl     = var.dns_ttl //must be 1 when proxied
   proxied = false
