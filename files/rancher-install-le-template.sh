@@ -2,15 +2,13 @@
 set -x
 set -e
 
-RANCHER_BRANCH=latest
-
 #check nodes
 export KUBECONFIG=$(pwd)/kube_config_rancher_cluster.yml
 kubectl get nodes
 kubectl get pods --all-namespaces
 
 #add helm repo
-helm repo add rancher-$${RANCHER_BRANCH} https://releases.rancher.com/server-charts/$${RANCHER_BRANCH}
+helm repo add rancher-${rancher_branch} https://releases.rancher.com/server-charts/${rancher_branch}
 kubectl create namespace cattle-system
 
 # cert-manager
@@ -27,7 +25,7 @@ helm install \
 kubectl -n cert-manager rollout status deploy/cert-manager
 
 set +e
-helm install rancher rancher-$${RANCHER_BRANCH}/rancher \
+helm install rancher rancher-${rancher_branch}/rancher \
   --version 2.3.4-rc7 \
   --namespace cattle-system \
   --set hostname=${hostname} \

@@ -30,3 +30,6 @@ override.tf.json
 
 terraform.tfvars
 /install.sh
+
+tls.crt
+tls.key

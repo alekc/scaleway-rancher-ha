@@ -28,3 +28,14 @@ variable "dns_ttl" {
 variable "node_count" {
   default = "1"
 }
+variable "rancher_branch" {
+  default = "stable"
+}
+variable "rancher_le_install" {
+  description = "Set to 1 for lets encrypt certificate installation"
+  default     = "0"
+}
+variable "rancher_cert_install" {
+  description = "Set to 1 for lets encrypt certificate installation"
+  default     = "0"
+}
