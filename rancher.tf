@@ -3,7 +3,7 @@
 data "template_file" "rancher_deploy" {
   template = file("files/rancher-install-le-template.sh")
   vars = {
-    hostname       = var.rancher_hostname_fqdn
+    hostname       = cloudflare_record.cluster_lb.hostname
     email          = var.letsencrypt_email
     le_env         = var.letsencrypt_env
     rancher_branch = var.rancher_branch
@@ -25,7 +25,7 @@ EOF
 data "template_file" "rancher_install_with_cert" {
   template = file("files/rancher-install-cert-template.sh")
   vars = {
-    hostname       = var.rancher_hostname_fqdn
+    hostname       = cloudflare_record.cluster_lb.hostname
     rancher_branch = var.rancher_branch
   }
 }
@@ -39,4 +39,12 @@ resource "null_resource" "install_rancher_with_cert" {
     ${data.template_file.rancher_install_with_cert.rendered}
 EOF
   }
+}
+provider "rancher2" {
+  api_url   = "https://${cloudflare_record.cluster_lb.hostname}"
+  bootstrap = true
+}
+resource "rancher2_bootstrap" "admin" {
+  telemetry = true
+  password  = var.rancher_password
 }

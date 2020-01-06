@@ -1,12 +1,12 @@
 #put rancher cluster configuration in yml file
 resource "local_file" "rke-config" {
   filename = format("%s/%s", path.root, "rancher_cluster.yml")
-  //    internal_address: ${node.private_ip}
   //noinspection HILUnresolvedReference
   content = <<EOF
 nodes:
 %{for node in scaleway_instance_server.rancherserver~}
   - address: ${node.public_ip}
+    internal_address: ${node.private_ip}
     user: root
     role: [controlplane, worker, etcd]
 %{endfor~}
